@@ -1,57 +1,101 @@
 using FileIO
 using Images
 
+# Functions that allow the conversion from images to Float64 arrays
+imageToGrayArray(image:: Array{RGB{Normed{UInt8,8}},2}) = convert(Array{Float64,2}, gray.(Gray.(image)));
+imageToGrayArray(image::Array{RGBA{Normed{UInt8,8}},2}) = imageToGrayArray(RGB.(image));
+function imageToColorArray(image::Array{RGB{Normed{UInt8,8}},2})
+    matrix = Array{Float64, 3}(undef, size(image,1), size(image,2), 3)
+    matrix[:,:,1] = convert(Array{Float64,2}, red.(image));
+    matrix[:,:,2] = convert(Array{Float64,2}, green.(image));
+    matrix[:,:,3] = convert(Array{Float64,2}, blue.(image));
+    return matrix;
+end;
+imageToColorArray(image::Array{RGBA{Normed{UInt8,8}},2}) = imageToColorArray(RGB.(image));
+
+# Some functions to display an image stored as Float64 matrix
+# Overload the existing display function, either for graysacale or color images
+import Base.display
+display(image::Array{Float64,2}) = display(Gray.(image));
+display(image::Array{Float64,3}) = (@assert(size(image,3)==3); display(RGB.(image[:,:,1],image[:,:,2],image[:,:,3])); )
+
 # Cargar una imagen
-madera = load("bloques/madera/madera.jpg");
-piedra = load("bloques/piedra/piedra.jpg");
+function loadFolderImages(folderName::String)
+    isImageExtension(fileName::String) = any(uppercase(fileName[end-3:end]) .== [".JPG", ".PNG"]);
+    images = [];
+    for fileName in readdir(folderName)
+        if isImageExtension(fileName)
+            image = load(string(folderName, "/", fileName));
+            # Check that they are color images
+            @assert(isa(image, Array{RGBA{Normed{UInt8,8}},2}) || isa(image, Array{RGB{Normed{UInt8,8}},2}))
+            # Add the image to the vector of images
+            push!(images, image);
+        end;
+    end;
+    # Convert the images to arrays by broadcasting the conversion functions, and return the resulting vectors
+    return (images);
+end;
 
-# Mostrar esa imagen, de cualquiera de estas dos formas
-display(madera)
-# using ImageView; imshow(imagen);
+function loadRedChannel(imageArray)
+    result = [];
+    for image in imageArray
+        matrizR = red.(image);
+        push!(result, matrizR);
+    end;
+    return result;
+end;
 
-# Que tipo tiene la imagen (es un array)
-typeof(madera)
-# Array{RGB{Normed{UInt8,8}},2}:
-#   Array bidimensional: Array{    ,2}
-#   donde cada elemento es de tipo RGB{Normed{UInt8,8}}
-# Tamaño de la imagen: el tamaño del array
-size(madera)
-# Por ejemplo, para ver el primer pixel:
-dump(madera[1,1])
-# Tipo: RGB{Normed{UInt8,8}}
-typeof(madera[1,1])
-# Cada pixel tiene 3 campos: r,g,b
-# Cada campo es del tipo indicado
-#  Normed{UInt8,8}): 8 bits, normalizado entre 0 y 1
-#  Por ejemplo, para comar la componente roja, de cualquiera de estas formas
-madera[1,1].r
-red(madera[1,1])
-# Las otras dos componentes, de igual manera:
-madera[1,1].g
-green(madera[1,1])
-madera[1,1].b
-blue(madera[1,1])
-# Para crear un elemento de tipo RGB, simplemente instanciar RGB indicando los 3 componentes, por ejemplo, el blanco:
-RGB(1,1,1)
+function loadBlueChannel(imageArray)
+    result = [];
+    for image in imageArray
+        matrizR = blue.(image);
+        push!(result, matrizR);
+    end;
+    return result;
+end;
 
+function loadGreenChannel(imageArray)
+    result = [];
+    for image in imageArray
+        matrizR = green.(image);
+        push!(result, matrizR);
+    end;
+    return result;
+end;
 
-# Para extraer un canal de la imagen, hacer un broadcast de la operacion correspondiente que se realiza a un pixel, pero a toda la matriz
-#  red(pixeles) -> devuelve la componente roja de ese pixel
-#  red.(array de pixeles) -> devuelve un array del mismo tamaño, con las componente rojas de esos pixeles
-# Por ejemplo:
-matrizR = red.(madera);
-matrizG = green.(madera);
-matrizB = blue.(madera);
-# Para construir una imagen solamente con ese canal, hacer una operacion de broadcast
-#  RGB(         1,        0, 0 ) -> devuelve el color rojo (solo un pixel)
-#  RGB.( [0.1, 0.5, 0.9], 0, 0 ) -> devuelve un array de 3 elementos (es decir, una imagen de 1 fila y 3 columnas) con esos colores. Esta linea es equivalente a:
-#  RGB.( [0.1, 0.5, 0.9], [0, 0, 0], [0, 0, 0] )
-# Por tanto, para construir la imagen solo con el canal rojo
-imagenRojo = RGB.(matrizR,0,0)
-display(imagenRojo);
-imagenVerde = RGB.(0,matrizG,0)
-display(imagenVerde);
-imagenAzul = RGB.(0,0,matrizB)
-display(imagenAzul);
-# De esta forma, la imagen original se pueden extraer sus 3 canales (rojo, verde y azul) y recomponerla de la siguiente manera:
-RGB.(red.(madera), green.(madera), blue.(madera))
+function displayImages(imageArrayR, imageArrayG, imageArrayB)
+    for image in imageArrayR
+        display(RGB.(image,0,0));
+    end;
+    for image in imageArrayG
+        display(RGB.(0,image,0));
+    end;
+    for image in imageArrayB
+        display(RGB.(0,0,image));
+    end;
+end;
+
+madera = loadFolderImages("bloques/madera");
+# piedra = load("bloques/piedra/piedra.jpg");
+
+channelR = loadRedChannel(madera);
+channelG = loadGreenChannel(madera);
+channelB = loadBlueChannel(madera);
+
+#displayImages(channelR, channelG, channelB);
+# matrizG = green.(madera);
+# matrizB = blue.(madera);
+# # Para construir una imagen solamente con ese canal, hacer una operacion de broadcast
+# #  RGB(         1,        0, 0 ) -> devuelve el color rojo (solo un pixel)
+# #  RGB.( [0.1, 0.5, 0.9], 0, 0 ) -> devuelve un array de 3 elementos (es decir, una imagen de 1 fila y 3 columnas) con esos colores. Esta linea es equivalente a:
+# #  RGB.( [0.1, 0.5, 0.9], [0, 0, 0], [0, 0, 0] )
+# # Por tanto, para construir la imagen solo con el canal rojo
+# imagenRojo = RGB.(matrizR,0,0)
+# imagenVerde = RGB.(0,matrizG,0)
+# imagenAzul = RGB.(0,0,matrizB)
+#
+# display(imagenRojo);
+# display(imagenVerde);
+# display(imagenAzul);
+# # De esta forma, la imagen original se pueden extraer sus 3 canales (rojo, verde y azul) y recomponerla de la siguiente manera:
+# RGB.(red.(madera), green.(madera), blue.(madera))
