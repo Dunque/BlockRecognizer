@@ -1,5 +1,6 @@
 using FileIO
 using Images
+using Statistics
 
 # Functions that allow the conversion from images to Float64 arrays
 imageToGrayArray(image:: Array{RGB{Normed{UInt8,8}},2}) = convert(Array{Float64,2}, gray.(Gray.(image)));
@@ -82,6 +83,13 @@ channelR = loadRedChannel(madera);
 channelG = loadGreenChannel(madera);
 channelB = loadBlueChannel(madera);
 
+meanR = mean(mean.(channelR))
+meanG = mean(mean.(channelG))
+meanB = mean(mean.(channelB))
+
+stdevR = mean(std.(channelR))
+stdevG = mean(std.(channelG))
+stdevB = mean(std.(channelB))
 #displayImages(channelR, channelG, channelB);
 # matrizG = green.(madera);
 # matrizB = blue.(madera);
