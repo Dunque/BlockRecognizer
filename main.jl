@@ -76,20 +76,61 @@ function displayImages(imageArrayR, imageArrayG, imageArrayB)
     end;
 end;
 
-madera = loadFolderImages("bloques/madera");
-# piedra = load("bloques/piedra/piedra.jpg");
+function loadTrainingDataset()
+    elementos=["madera","piedra"]
+    targets=Array{Any,2}(undef, 0, 7);
+    for cada_uno_de_los_elementos in elementos
+        folder=string("bloques/",cada_uno_de_los_elementos)
+        elemento = loadFolderImages(folder);
+        channelR = loadRedChannel(elemento);
+        channelG = loadGreenChannel(elemento);
+        channelB = loadBlueChannel(elemento);
+        for input = 1:length(channelR)
+            line=[mean(channelR[input]) #=
+            =# mean(channelG[input]) #=
+            =# mean(channelB[input]) #=
+            =# std(channelR[input]) #=
+            =# std(channelG[input]) #=
+            =# std(channelB[input]) #=
+            =# cada_uno_de_los_elementos]
+            targets=[targets;line]
+        end;
+    end;
+    return targets
+end;
 
-channelR = loadRedChannel(madera);
-channelG = loadGreenChannel(madera);
-channelB = loadBlueChannel(madera);
+function oneHotEncoding(feature::Array{Any,1}, classes::Array{Any,1})
+    # Primero se comprueba que todos los elementos del vector esten en el vector de clases (linea adaptada del final de la practica 4)
+    @assert(all([in(value, classes) for value in feature]));
+    numClasses = length(classes);
+    @assert(numClasses>1)
+    if (numClasses==2)
+        # Si solo hay dos clases, se devuelve una matriz con una columna
+        oneHot = Array{Bool,2}(undef, size(feature,1), 1);
+        oneHot[:,1] .= (feature.==classes[1]);
+    else
+        # Si hay mas de dos clases se devuelve una matriz con una columna por clase
+        oneHot = Array{Bool,2}(undef, size(feature,1), numClasses);
+        for numClass = 1:numClasses
+            oneHot[:,numClass] .= (feature.==classes[numClass]);
+        end;
+    end;
+    return oneHot;
+end;
+oneHotEncoding(feature::Array{Any,1}) = oneHotEncoding(feature::Array{Any,1}, unique(feature));
 
-meanR = mean(mean.(channelR))
-meanG = mean(mean.(channelG))
-meanB = mean(mean.(channelB))
 
-stdevR = mean(std.(channelR))
-stdevG = mean(std.(channelG))
-stdevB = mean(std.(channelB))
+dataset=loadTrainingDataset();
+inputs=dataset[:,1:6];
+inputs=Float64.(inputs);
+println("Tamaño de la matriz de entradas: ", size(inputs,1), "x", size(inputs,2), " de tipo ", typeof(inputs));
+targets = dataset[:,7];
+println("Longitud del vector de salidas deseadas antes de codificar: ", length(targets), " de tipo ", typeof(targets));
+targets = oneHotEncoding(targets);
+println("Tamaño de la matriz de salidas deseadas despues de codificar: ", size(targets,1), "x", size(targets,2), " de tipo ", typeof(targets));
+# Comprobamos que ambas matrices tienen el mismo número de filas
+@assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo numero de filas"
+
 #displayImages(channelR, channelG, channelB);
 # matrizG = green.(madera);
 # matrizB = blue.(madera);
