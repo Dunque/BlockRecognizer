@@ -1,6 +1,7 @@
 using FileIO
 using Images
 using Statistics
+using Flux
 
 # Functions that allow the conversion from images to Float64 arrays
 imageToGrayArray(image:: Array{RGB{Normed{UInt8,8}},2}) = convert(Array{Float64,2}, gray.(Gray.(image)));
@@ -119,6 +120,135 @@ function oneHotEncoding(feature::Array{Any,1}, classes::Array{Any,1})
 end;
 oneHotEncoding(feature::Array{Any,1}) = oneHotEncoding(feature::Array{Any,1}, unique(feature));
 
+accuracy(outputs::Array{Bool,1}, targets::Array{Bool,1}) = mean(outputs.==targets);
+function accuracy(outputs::Array{Bool,2}, targets::Array{Bool,2}; dataInRows::Bool=true)
+    @assert(all(size(outputs).==size(targets)));
+    if (dataInRows)
+        # Cada patron esta en cada fila
+        if (size(targets,2)==1)
+            return accuracy(outputs[:,1], targets[:,1]);
+        else
+            classComparison = targets .== outputs
+            correctClassifications = all(classComparison, dims=2)
+            return mean(correctClassifications)
+        end;
+    else
+        # Cada patron esta en cada columna
+        if (size(targets,1)==1)
+            return accuracy(outputs[1,:], targets[1,:]);
+        else
+            classComparison = targets .== outputs
+            correctClassifications = all(classComparison, dims=1)
+            return mean(correctClassifications)
+        end;
+    end;
+end;
+
+accuracy(outputs::Array{Float64,1}, targets::Array{Bool,1}; threshold::Float64=0.5) = accuracy(Array{Bool,1}(outputs.>=threshold), targets);
+function accuracy(outputs::Array{Float64,2}, targets::Array{Bool,2}; dataInRows::Bool=true)
+    @assert(all(size(outputs).==size(targets)));
+    if (dataInRows)
+        # Cada patron esta en cada fila
+        if (size(targets,2)==1)
+            return accuracy(outputs[:,1], targets[:,1]);
+        else
+            return accuracy(classifyOutputs(outputs; dataInRows=true), targets);
+        end;
+    else
+        # Cada patron esta en cada columna
+        if (size(targets,1)==1)
+            return accuracy(outputs[1,:], targets[1,:]);
+        else
+            return accuracy(classifyOutputs(outputs; dataInRows=false), targets);
+        end;
+    end;
+end;
+accuracy(outputs::Array{Float32,1}, targets::Array{Bool,1}; threshold::Float64=0.5) = accuracy(Float64.(outputs), targets; threshold=threshold);
+accuracy(outputs::Array{Float32,2}, targets::Array{Bool,2}; dataInRows::Bool=true)  = accuracy(Float64.(outputs), targets; dataInRows=dataInRows);
+
+calculateMinMaxNormalizationParameters(dataset::Array{Float64,2}; dataInRows=true) =
+    ( minimum(dataset, dims=(dataInRows ? 1 : 2)), maximum(dataset, dims=(dataInRows ? 1 : 2)) );
+
+function normalizeMinMax!(dataset::Array{Float64,2}, normalizationParameters::Tuple{Array{Float64,2},Array{Float64,2}}; dataInRows=true)
+    min = normalizationParameters[1];
+    max = normalizationParameters[2];
+    dataset .-= min;
+    dataset ./= (max .- min);
+    # Si hay algun atributo en el que todos los valores son iguales, se pone a 0
+    if (dataInRows)
+        dataset[:, vec(min.==max)] .= 0;
+    else
+        dataset[vec(min.==max), :] .= 0;
+    end
+end;
+normalizeMinMax!(dataset::Array{Float64,2}; dataInRows=true) = normalizeMinMax!(dataset, calculateMinMaxNormalizationParameters(dataset; dataInRows=dataInRows); dataInRows=dataInRows);
+
+function buildClassANN(numInputs::Int64, topology::Array{Int64,1}, numOutputs::Int64)
+    ann=Chain();
+    numInputsLayer = numInputs;
+    for numOutputLayers = topology
+        ann = Chain(ann..., Dense(numInputsLayer, numOutputLayers, σ));
+        numInputsLayer = numOutputLayers;
+    end;
+    if (numOutputs == 1)
+        ann = Chain(ann..., Dense(numInputsLayer, 1, σ));
+    else
+        ann = Chain(ann..., Dense(numInputsLayer, numOutputs, identity));
+        ann = Chain(ann..., softmax);
+    end;
+    return ann;
+end;
+
+function trainClassANN(topology::Array{Int64,1}, inputs::Array{Float64,2}, targets::Array{Bool,2}; maxEpochs::Int64=1000, minLoss::Float64=0.0, learningRate::Float64=0.1)
+    # Se supone que tenemos cada patron en cada fila
+    # Comprobamos que el numero de filas (numero de patrones) coincide
+    @assert(size(inputs,1)==size(targets,1));
+    # Creamos la RNA
+    ann = buildClassANN(size(inputs,2), topology, size(targets,2));
+    # Definimos la funcion de loss
+    loss(x,y) = (size(y,1) == 1) ? Losses.binarycrossentropy(ann(x),y) : Losses.crossentropy(ann(x),y);
+    # Creamos los vectores con los valores de loss y de precision en cada ciclo
+    trainingLosses = Float64[];
+    trainingAccuracies = Float64[];
+    # Empezamos en el ciclo 0
+    numEpoch = 0;
+
+    # Una funcion util para calcular los resultados y mostrarlos por pantalla
+    function calculateMetrics()
+        # Calculamos el loss. Para ello hay que pasar las matrices traspuestas (cada patron en una columna)
+        trainingLoss = loss(inputs', targets');
+        # Calculamos la salida de la RNA. Para ello hay que pasar la matriz de entradas traspuesta (cada patron en una columna). La matriz de salidas tiene un patron en cada columna
+        outputs = ann(inputs');
+        # Para calcular la precision, ponemos 2 opciones aqui equivalentes:
+        #  Pasar las matrices con los datos en las columnas. La matriz de salidas ya tiene un patron en cada columna
+        acc = accuracy(outputs, Array{Bool,2}(targets'); dataInRows=false);
+        #  Pasar las matrices con los datos en las filas. Hay que trasponer la matriz de salidas de la RNA, puesto que cada dato esta en una fila
+        acc = accuracy(Array{Float64,2}(outputs'), targets; dataInRows=true);
+        # Mostramos por pantalla el resultado de este ciclo de entrenamiento
+        println("Epoch ", numEpoch, ": loss: ", trainingLoss, ", accuracy: ", 100*acc, " %");
+        return (trainingLoss, acc)
+    end;
+
+    # Calculamos las metricas para el ciclo 0 (sin entrenar nada)
+    (trainingLoss, trainingAccuracy) = calculateMetrics();
+    #  y almacenamos el valor de loss y precision en este ciclo
+    push!(trainingLosses, trainingLoss);
+    push!(trainingAccuracies, trainingAccuracy);
+
+    # Entrenamos hasta que se cumpla una condicion de parada
+    while (numEpoch<maxEpochs) && (trainingLoss>minLoss)
+        # Entrenamos 1 ciclo. Para ello hay que pasar las matrices traspuestas (cada patron en una columna)
+        Flux.train!(loss, params(ann), [(inputs', targets')], ADAM(learningRate));
+        # Aumentamos el numero de ciclo en 1
+        numEpoch += 1;
+        # Calculamos las metricas en este ciclo
+        (trainingLoss, trainingAccuracy) = calculateMetrics()
+        #  y almacenamos el valor de loss y precision en este ciclo
+        push!(trainingLosses, trainingLoss);
+        push!(trainingAccuracies, trainingAccuracy);
+    end;
+    return (ann, trainingLosses, trainingAccuracies);
+end;
 
 dataset=loadTrainingDataset();
 inputs=dataset[:,1:6];
@@ -131,20 +261,13 @@ println("Tamaño de la matriz de salidas deseadas despues de codificar: ", size(
 # Comprobamos que ambas matrices tienen el mismo número de filas
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo numero de filas"
 
-#displayImages(channelR, channelG, channelB);
-# matrizG = green.(madera);
-# matrizB = blue.(madera);
-# # Para construir una imagen solamente con ese canal, hacer una operacion de broadcast
-# #  RGB(         1,        0, 0 ) -> devuelve el color rojo (solo un pixel)
-# #  RGB.( [0.1, 0.5, 0.9], 0, 0 ) -> devuelve un array de 3 elementos (es decir, una imagen de 1 fila y 3 columnas) con esos colores. Esta linea es equivalente a:
-# #  RGB.( [0.1, 0.5, 0.9], [0, 0, 0], [0, 0, 0] )
-# # Por tanto, para construir la imagen solo con el canal rojo
-# imagenRojo = RGB.(matrizR,0,0)
-# imagenVerde = RGB.(0,matrizG,0)
-# imagenAzul = RGB.(0,0,matrizB)
-#
-# display(imagenRojo);
-# display(imagenVerde);
-# display(imagenAzul);
-# # De esta forma, la imagen original se pueden extraer sus 3 canales (rojo, verde y azul) y recomponerla de la siguiente manera:
-# RGB.(red.(madera), green.(madera), blue.(madera))
+
+topology = [4, 3];
+learningRate = 0.01;
+numMaxEpochs = 1000;
+
+#newInputs = normalizeMinMax(inputs);
+normalizeMinMax!(inputs);
+@assert(all(minimum(newInputs, dims=1) .== 0));
+@assert(all(maximum(newInputs, dims=1) .== 1));
+(ann, trainingLosses, trainingAccuracies) = trainClassANN(topology, inputs, targets; maxEpochs=numMaxEpochs, learningRate=learningRate);
