@@ -1,8 +1,9 @@
 using FileIO
 using Images
 using Statistics
-using Flux.Losses
+using Flux
 using Random
+using Plots
 
 # Functions that allow the conversion from images to Float64 arrays
 imageToGrayArray(image:: Array{RGB{Normed{UInt8,8}},2}) = convert(Array{Float64,2}, gray.(Gray.(image)));
@@ -217,7 +218,7 @@ function trainClassANN(topology::Array{Int64,1},
     # Creamos la RNA
     ann = buildClassANN(size(trainingInputs,2), topology, size(trainingTargets,2));
     # Definimos la funcion de loss
-    loss(x,y) = (size(y,1) == 1) ? Losses.binarycrossentropy(ann(x),y) : Losses.crossentropy(ann(x),y);
+    loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(ann(x),y) : Losses.crossentropy(ann(x),y);
     # Creamos los vectores con los valores de loss y de precision en cada ciclo
     trainingLosses = Float64[];
     trainingAccuracies = Float64[];
@@ -352,3 +353,7 @@ testTargets       = targets[testIndices,:];
     validationInputs, validationTargets,
     testInputs,       testTargets;
     maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=true);
+
+results=plot()
+plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Training losses", label="Training")
+display(results)
