@@ -334,28 +334,51 @@ numMaxEpochs = 1000;
 validationRatio = 0.2;
 testRatio = 0.2;
 maxEpochsVal = 15;
+timesRepeated = 10;
 
-#newInputs = normalizeMinMax(inputs);
-normalizeMinMax!(inputs);
-@assert(all(minimum(inputs, dims=1) .== 0));
-@assert(all(maximum(inputs, dims=1) .== 1));
+for i in 0:timesRepeated
+    #newInputs = normalizeMinMax(inputs);
+    normalizeMinMax!(inputs);
+    @assert(all(minimum(inputs, dims=1) .== 0));
+    @assert(all(maximum(inputs, dims=1) .== 1));
 
-(trainingIndices, validationIndices, testIndices) = holdOut(size(inputs,1), validationRatio, testRatio);
-trainingInputs    = inputs[trainingIndices,:];
-validationInputs  = inputs[validationIndices,:];
-testInputs        = inputs[testIndices,:];
-trainingTargets   = targets[trainingIndices,:];
-validationTargets = targets[validationIndices,:];
-testTargets       = targets[testIndices,:];
+    (trainingIndices, validationIndices, testIndices) = holdOut(size(inputs,1), validationRatio, testRatio);
+    trainingInputs    = inputs[trainingIndices,:];
+    validationInputs  = inputs[validationIndices,:];
+    testInputs        = inputs[testIndices,:];
+    trainingTargets   = targets[trainingIndices,:];
+    validationTargets = targets[validationIndices,:];
+    testTargets       = targets[testIndices,:];
 
-(ann, trainingLosses, validationLosses, testLosses, trainingAccuracies) = trainClassANN(topology,
-    trainingInputs,   trainingTargets,
-    validationInputs, validationTargets,
-    testInputs,       testTargets;
-    maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=true);
+    (ann, trainingLosses, validationLosses, testLosses, trainingAccuracies) = trainClassANN(topology,
+        trainingInputs,   trainingTargets,
+        validationInputs, validationTargets,
+        testInputs,       testTargets;
+        maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=true);
 
-results=plot()
-plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses", label="Training")
-plot!(results,1:length(validationLosses),validationLosses, label="Validation")
-plot!(results,1:length(testLosses),testLosses, label="Test")
-display(results)
+    results=plot()
+    plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses iteration " * string(i), label="Training")
+    plot!(results,1:length(validationLosses),validationLosses, label="Validation")
+    plot!(results,1:length(testLosses),testLosses, label="Test")
+    display(results)
+
+    if i == 0
+        global trainingLossesB = trainingLosses;
+        global validationLossesB = validationLosses;
+        global testLossesB = testLosses;
+    end
+
+    if mean(mean(trainingLosses) + mean(validationLosses) + mean(testLosses)) <= mean(mean(trainingLossesB) + mean(validationLossesB) + mean(testLossesB))
+        global weights = params(ann)
+        using BSON: @save
+        @save "mymodel.bson" weights
+
+        trainingLossesB = trainingLosses
+        validationLossesB = validationLosses
+        testLossesB = testLosses
+        println("SAVED WEIGHTS ------------------------------------------------------------------------")
+        println(mean(trainingLossesB))
+        println(mean(validationLossesB))
+        println(mean(testLossesB))
+    end
+end
