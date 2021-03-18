@@ -218,7 +218,7 @@ function trainClassANN(topology::Array{Int64,1},
     # Creamos la RNA
     ann = buildClassANN(size(trainingInputs,2), topology, size(trainingTargets,2));
     # Definimos la funcion de loss
-    loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(ann(x),y) : Losses.crossentropy(ann(x),y);
+    loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(ann(x),y) : Flux.Losses.crossentropy(ann(x),y);
     # Creamos los vectores con los valores de loss y de precision en cada ciclo
     trainingLosses = Float64[];
     trainingAccuracies = Float64[];
@@ -333,7 +333,7 @@ learningRate = 0.01;
 numMaxEpochs = 1000;
 validationRatio = 0.2;
 testRatio = 0.2;
-maxEpochsVal = 6;
+maxEpochsVal = 15;
 
 #newInputs = normalizeMinMax(inputs);
 normalizeMinMax!(inputs);
@@ -348,12 +348,14 @@ trainingTargets   = targets[trainingIndices,:];
 validationTargets = targets[validationIndices,:];
 testTargets       = targets[testIndices,:];
 
-(ann, trainingLosses, trainingAccuracies) = trainClassANN(topology,
+(ann, trainingLosses, validationLosses, testLosses, trainingAccuracies) = trainClassANN(topology,
     trainingInputs,   trainingTargets,
     validationInputs, validationTargets,
     testInputs,       testTargets;
     maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=true);
 
 results=plot()
-plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Training losses", label="Training")
+plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses", label="Training")
+plot!(results,1:length(validationLosses),validationLosses, label="Validation")
+plot!(results,1:length(testLosses),testLosses, label="Test")
 display(results)
