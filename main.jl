@@ -4,6 +4,8 @@ using Statistics
 using Flux
 using Random
 using Plots
+using BSON
+using Zygote
 
 # Functions that allow the conversion from images to Float64 arrays
 imageToGrayArray(image:: Array{RGB{Normed{UInt8,8}},2}) = convert(Array{Float64,2}, gray.(Gray.(image)));
@@ -333,7 +335,7 @@ learningRate = 0.01;
 numMaxEpochs = 1000;
 validationRatio = 0.2;
 testRatio = 0.2;
-maxEpochsVal = 15;
+maxEpochsVal = 100;
 timesRepeated = 10;
 
 for i in 0:timesRepeated
@@ -356,6 +358,9 @@ for i in 0:timesRepeated
         testInputs,       testTargets;
         maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=true);
 
+    weights = BSON.load("myweights.bson")
+    params(ann) = weights
+
     results=plot()
     plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses iteration " * string(i), label="Training")
     plot!(results,1:length(validationLosses),validationLosses, label="Validation")
@@ -371,7 +376,7 @@ for i in 0:timesRepeated
     if mean(mean(trainingLosses) + mean(validationLosses) + mean(testLosses)) <= mean(mean(trainingLossesB) + mean(validationLossesB) + mean(testLossesB))
         global weights = params(ann)
         using BSON: @save
-        @save "mymodel.bson" weights
+        @save "myweights.bson" weights
 
         trainingLossesB = trainingLosses
         validationLossesB = validationLosses
