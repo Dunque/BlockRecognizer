@@ -505,7 +505,7 @@ function selectBestAnn(topology::Array{Array{Int64,1},1},learningRate::Float64,
                 trainingInputs,   trainingTargets,
                 validationInputs, validationTargets,
                 testInputs,       testTargets;
-                maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=true);
+                maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=false);
 
             weights = BSON.load("myweights.bson")
             params(ann) = weights
@@ -519,15 +519,13 @@ function selectBestAnn(topology::Array{Array{Int64,1},1},learningRate::Float64,
             trainingOutputs = collect(ann(trainingInputs')');
             printConfusionMatrix(trainingOutputs, trainingTargets; weighted=true);
 
-            if i == 0 && j==0
-                global trainingLossesB = trainingLosses;
+            if i == 0 && j==1
                 global validationLossesB = validationLosses;
-                global testLossesB = testLosses;
             end
 
             if (mean(validationLosses) <= mean(validationLossesB))
                 global weights = params(ann)
-                local finalann=deepcopy(ann)
+                global finalann=deepcopy(ann)
                 global finalIteration=deepcopy(i);
                 global finalTrainingLosses=deepcopy(trainingLosses);
                 global finalValidationLosses=deepcopy(validationLosses);
@@ -536,14 +534,10 @@ function selectBestAnn(topology::Array{Array{Int64,1},1},learningRate::Float64,
                 #using BSON: @save
                 BSON.@save "myweights.bson" weights
 
-                trainingLossesB = trainingLosses
                 validationLossesB = validationLosses
-                testLossesB = testLosses
                 println("SAVED WEIGHTS ------------------------------------------------------------------------")
                 println("Iteration ",i)
-                println(mean(trainingLossesB))
                 println(mean(validationLossesB))
-                println(mean(testLossesB))
             end
         end
     end;
@@ -573,9 +567,14 @@ timesRepeated = 1;
 local ann;
 
 (ann,iteration,finalTopology,trainingLosses,validationLosses,testLosses) = selectBestAnn(topology,learningRate,numMaxEpochs,validationRatio,testRatio,maxEpochsVal,timesRepeated)
+println()
+println("Plotting the best results ------------------------------------------------------------------")
+println()
 finalResults=plot()
 plot!(finalResults,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses Topology: "*string(finalTopology), label="Training")
 plot!(finalResults,1:length(validationLosses),validationLosses, label="Validation")
 plot!(finalResults,1:length(testLosses),testLosses, label="Test")
 display(finalResults)
-println(iteration)
+println("Topology: ", finalTopology)
+println("Iteración: ", iteration)
+println("% of validation losses: ", mean(validationLosses))
