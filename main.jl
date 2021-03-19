@@ -319,13 +319,7 @@ function holdOut(N::Int, Pval::Float64, Ptest::Float64)
 end;
 
 function classifyOutputs(outputs::Array{Float64,2}; dataInRows::Bool=true)
-    # Miramos donde esta el valor mayor de cada instancia con la funcion findmax
-    (_,indicesMaxEachInstance) = findmax(outputs, dims= dataInRows ? 2 : 1);
-    # Creamos la matriz de valores booleanos con valores inicialmente a false y asignamos esos indices a true
-    outputsBoolean = Array{Bool,2}(falses(size(outputs)));
-    outputsBoolean[indicesMaxEachInstance] .= true;
-    # Comprobamos que efectivamente cada patron solo este clasificado en una clase
-    @assert(all(sum(outputsBoolean, dims=dataInRows ? 2 : 1).==1));
+    outputsBoolean=Array{Bool,2}(Bool.(round.(outputs)));
     return outputsBoolean;
 end;
 
@@ -574,11 +568,3 @@ display(finalResults)
 println("Topology: ", finalTopology)
 println("Iteración: ", iteration)
 println("% of validation losses: ", mean(validationLosses))
-
-
-elemento=load(string("prueba/prueba1.JPG"));
-channelR = red.(elemento);
-channelG = green.(elemento);
-channelB =blue.(elemento);
-line=[mean(channelR) mean(channelG) mean(channelB) std(channelR) std(channelG) std(channelB)];
-ann(line')
