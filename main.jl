@@ -478,22 +478,18 @@ function printConfusionMatrix(outputs::Array{Bool,2}, targets::Array{Bool,2}; we
 end;
 printConfusionMatrix(outputs::Array{Float64,2}, targets::Array{Bool,2}; weighted::Bool=true) =  printConfusionMatrix(classifyOutputs(outputs), targets; weighted=weighted)
 
-function selectBestAnn(topology::Array{Array{Int64,1},1},learningRate::Float64,
+function selectBestAnn(inputs::Array{Float64,2},targets::Array{Bool,2},
+                        topology::Array{Array{Int64,1},1},learningRate::Float64,
                         numMaxEpochs::Int,validationRatio::Float64,
                         testRatio::Float64,maxEpochsVal::Int,timesRepeated::Int)
     for j in 1:length(topology)
         for i in 0:timesRepeated
             #newInputs = normalizeMinMax(inputs);
-            normalizeMinMax!(inputs);
-            @assert(all(minimum(inputs, dims=1) .== 0));
-            @assert(all(maximum(inputs, dims=1) .== 1));
+            #normalizeMinMax!(inputs);
+            #@assert(all(minimum(inputs, dims=1) .== 0));
+            #@assert(all(maximum(inputs, dims=1) .== 1));
 
             (trainingIndices, validationIndices, testIndices) = holdOut(size(inputs,1), validationRatio, testRatio);
-            if(i==timesRepeated)
-                println(trainingIndices)
-                println(validationIndices)
-                println(testIndices)
-            end
             trainingInputs    = inputs[trainingIndices,:];
             validationInputs  = inputs[validationIndices,:];
             testInputs        = inputs[testIndices,:];
@@ -556,7 +552,7 @@ println("Tamaño de la matriz de salidas deseadas despues de codificar: ", size(
 @assert (size(inputs,1)==size(targets,1)) "Las matrices de entradas y salidas deseadas no tienen el mismo numero de filas"
 
 
-topology = [[4, 3],[5,6]];
+topology = [[4, 3],[5,6],[2,2]];
 learningRate = 0.01;
 numMaxEpochs = 1000;
 validationRatio = 0.2;
@@ -566,7 +562,7 @@ timesRepeated = 1;
 
 local ann;
 
-(ann,iteration,finalTopology,trainingLosses,validationLosses,testLosses) = selectBestAnn(topology,learningRate,numMaxEpochs,validationRatio,testRatio,maxEpochsVal,timesRepeated)
+(ann,iteration,finalTopology,trainingLosses,validationLosses,testLosses) = selectBestAnn(inputs,targets,topology,learningRate,numMaxEpochs,validationRatio,testRatio,maxEpochsVal,timesRepeated)
 println()
 println("Plotting the best results ------------------------------------------------------------------")
 println()
@@ -578,3 +574,11 @@ display(finalResults)
 println("Topology: ", finalTopology)
 println("Iteración: ", iteration)
 println("% of validation losses: ", mean(validationLosses))
+
+
+elemento=load(string("prueba/prueba1.JPG"));
+channelR = red.(elemento);
+channelG = green.(elemento);
+channelB =blue.(elemento);
+line=[mean(channelR) mean(channelG) mean(channelB) std(channelR) std(channelG) std(channelB)];
+ann(line')
