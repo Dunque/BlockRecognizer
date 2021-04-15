@@ -479,6 +479,41 @@ function printConfusionMatrix(outputs::Array{Bool,2}, targets::Array{Bool,2}; we
     return (acc, errorRate, recall, specificity, precision, NPV, F1, confMatrix);
 end;
 
+function printConfusionMatrix(outputs::Array{Any,1}, targets::Array{Any,1}; weighted::Bool=true)
+    (acc, errorRate, recall, specificity, precision, NPV, F1, confMatrix) = confusionMatrix(outputs, targets; weighted=weighted);
+    numClasses = size(confMatrix,1);
+    writeHorizontalLine() = (for i in 1:numClasses+1 print("--------") end; println(""); );
+    writeHorizontalLine();
+    print("\t| ");
+    if (numClasses==2)
+        println(" - \t + \t|");
+    else
+        print.("Cl. ", 1:numClasses, "\t| ");
+    end;
+    println("");
+    writeHorizontalLine();
+    for numClassTarget in 1:numClasses
+        # print.(confMatrix[numClassTarget,:], "\t");
+        if (numClasses==2)
+            print(numClassTarget == 1 ? " - \t| " : " + \t| ");
+        else
+            print("Cl. ", numClassTarget, "\t| ");
+        end;
+        print.(confMatrix[numClassTarget,:], "\t| ");
+        println("");
+        writeHorizontalLine();
+    end;
+    println("Accuracy: ", acc);
+    println("Error rate: ", errorRate);
+    println("Recall: ", recall);
+    println("Specificity: ", specificity);
+    println("Precision: ", precision);
+    println("Negative predictive value: ", NPV);
+    println("F1-score: ", F1);
+    println();
+    return (acc, errorRate, recall, specificity, precision, NPV, F1, confMatrix);
+end;
+
 printConfusionMatrix(outputs::Array{Float64,2}, targets::Array{Bool,2}; weighted::Bool=true) =  printConfusionMatrix(classifyOutputs(outputs), targets; weighted=weighted)
 
 function selectBestAnn(inputs::Array{Float64,2},targets::Array{Bool,2},
