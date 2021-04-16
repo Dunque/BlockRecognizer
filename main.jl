@@ -516,67 +516,67 @@ end;
 
 printConfusionMatrix(outputs::Array{Float64,2}, targets::Array{Bool,2}; weighted::Bool=true) =  printConfusionMatrix(classifyOutputs(outputs), targets; weighted=weighted)
 
-function selectBestAnn(inputs::Array{Float64,2},targets::Array{Bool,2},
-                        topology::Array{Array{Int64,1},1},learningRate::Float64,
-                        numMaxEpochs::Int,validationRatio::Float64,
-                        testRatio::Float64,maxEpochsVal::Int,timesRepeated::Int)
-    for j in 1:length(topology)
-        for i in 0:timesRepeated
-            #newInputs = normalizeMinMax(inputs);
-            #normalizeMinMax!(inputs);
-            #@assert(all(minimum(inputs, dims=1) .== 0));
-            #@assert(all(maximum(inputs, dims=1) .== 1));
-
-            (trainingIndices, validationIndices, testIndices) = holdOut(size(inputs,1), validationRatio, testRatio);
-            trainingInputs    = inputs[trainingIndices,:];
-            validationInputs  = inputs[validationIndices,:];
-            testInputs        = inputs[testIndices,:];
-            trainingTargets   = targets[trainingIndices,:];
-            validationTargets = targets[validationIndices,:];
-            testTargets       = targets[testIndices,:];
-
-            (ann, trainingLosses, validationLosses, testLosses, trainingAccuracies) = trainClassANN(topology[j],
-                trainingInputs,   trainingTargets,
-                validationInputs, validationTargets,
-                testInputs,       testTargets;
-                maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=false);
-
-            weights = BSON.load("myweights.bson")
-            params(ann) = weights
-
-            results=plot()
-            plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses iteration " * string(i)*" Top: "*string(topology[j]), label="Training")
-            plot!(results,1:length(validationLosses),validationLosses, label="Validation")
-            plot!(results,1:length(testLosses),testLosses, label="Test")
-            display(results)
-
-            trainingOutputs = collect(ann(trainingInputs')');
-            printConfusionMatrix(trainingOutputs, trainingTargets; weighted=true);
-
-            if i == 0 && j==1
-                global validationLossesB = validationLosses;
-            end
-
-            if (mean(validationLosses) <= mean(validationLossesB))
-                global weights = params(ann)
-                global finalann=deepcopy(ann)
-                global finalIteration=deepcopy(i);
-                global finalTrainingLosses=deepcopy(trainingLosses);
-                global finalValidationLosses=deepcopy(validationLosses);
-                global finalTestLosses=deepcopy(testLosses);
-                global finalTopology=deepcopy(topology[j])
-                #using BSON: @save
-                BSON.@save "myweights.bson" weights
-
-                validationLossesB = validationLosses
-                println("SAVED WEIGHTS ------------------------------------------------------------------------")
-                println("Iteration ",i)
-                println(mean(validationLossesB))
-            end
-        end
-    end;
-    return finalann,finalIteration,finalTopology,finalTrainingLosses,finalValidationLosses,finalTestLosses
-end;
+# function selectBestAnn(inputs::Array{Float64,2},targets::Array{Bool,2},
+#                         topology::Array{Array{Int64,1},1},learningRate::Float64,
+#                         numMaxEpochs::Int,validationRatio::Float64,
+#                         testRatio::Float64,maxEpochsVal::Int,timesRepeated::Int)
+#     for j in 1:length(topology)
+#         for i in 0:timesRepeated
+#             #newInputs = normalizeMinMax(inputs);
+#             #normalizeMinMax!(inputs);
+#             #@assert(all(minimum(inputs, dims=1) .== 0));
+#             #@assert(all(maximum(inputs, dims=1) .== 1));
+#
+#             (trainingIndices, validationIndices, testIndices) = holdOut(size(inputs,1), validationRatio, testRatio);
+#             trainingInputs    = inputs[trainingIndices,:];
+#             validationInputs  = inputs[validationIndices,:];
+#             testInputs        = inputs[testIndices,:];
+#             trainingTargets   = targets[trainingIndices,:];
+#             validationTargets = targets[validationIndices,:];
+#             testTargets       = targets[testIndices,:];
+#
+#             (ann, trainingLosses, validationLosses, testLosses, trainingAccuracies) = trainClassANN(topology[j],
+#                 trainingInputs,   trainingTargets,
+#                 validationInputs, validationTargets,
+#                 testInputs,       testTargets;
+#                 maxEpochs=numMaxEpochs, learningRate=learningRate, maxEpochsVal=maxEpochsVal, showText=false);
+#
+#             weights = BSON.load("myweights.bson")
+#             params(ann) = weights
+#
+#             results=plot()
+#             plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses iteration " * string(i)*" Top: "*string(topology[j]), label="Training")
+#             plot!(results,1:length(validationLosses),validationLosses, label="Validation")
+#             plot!(results,1:length(testLosses),testLosses, label="Test")
+#             display(results)
+#
+#             trainingOutputs = collect(ann(trainingInputs')');
+#             printConfusionMatrix(trainingOutputs, trainingTargets; weighted=true);
+#
+#             if i == 0 && j==1
+#                 global validationLossesB = validationLosses;
+#             end
+#
+#             if (mean(validationLosses) <= mean(validationLossesB))
+#                 global weights = params(ann)
+#                 global finalann=deepcopy(ann)
+#                 global finalIteration=deepcopy(i);
+#                 global finalTrainingLosses=deepcopy(trainingLosses);
+#                 global finalValidationLosses=deepcopy(validationLosses);
+#                 global finalTestLosses=deepcopy(testLosses);
+#                 global finalTopology=deepcopy(topology[j])
+#                 #using BSON: @save
+#                 BSON.@save "myweights.bson" weights
+#
+#                 validationLossesB = validationLosses
+#                 println("SAVED WEIGHTS ------------------------------------------------------------------------")
+#                 println("Iteration ",i)
+#                 println(mean(validationLossesB))
+#             end
+#         end
+#     end;
+#     return finalann,finalIteration,finalTopology,finalTrainingLosses,finalValidationLosses,finalTestLosses
+# end;
 
 dataset=loadTrainingDataset();
 inputs=dataset[:,1:6];
@@ -683,14 +683,41 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
                         maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"],
                         maxEpochsVal=modelHyperparameters["maxEpochsVal"], showText=false);
 
+
+                    weights = BSON.load("myweights.bson")
+                    params(ann) = weights
+
                     results=plot();
-                    plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses iteration " * string(numTraining)*" Top: "*string(topology), label="Training")
+                    plot!(results,1:length(trainingLosses),trainingLosses, xaxis="Epoch",yaxis="Loss",title="Losses fold " * string(numFold)*" Top: "*string(topology), label="Training")
                     plot!(results,1:length(validationLosses),validationLosses, label="Validation")
                     plot!(results,1:length(testLosses),testLosses, label="Test")
                     display(results)
 
                     trainingOutputs = collect(ann(trainingInputs')');
                     printConfusionMatrix(trainingOutputs, trainingTargets; weighted=true);
+
+                    if numFold == 1
+                        global validationLossesB = validationLosses;
+                    end
+
+                    if (mean(validationLosses) <= mean(validationLossesB))
+                        global weights = params(ann)
+                        global finalann = deepcopy(ann)
+                        global finalIteration = deepcopy(numFold);
+                        global finalTrainingLosses = deepcopy(trainingLosses);
+                        global finalValidationLosses = deepcopy(validationLosses);
+                        global finalTestLosses = deepcopy(testLosses);
+
+                        #using BSON: @save
+                        BSON.@save "myweights.bson" weights
+
+                        validationLossesB = validationLosses
+                        println("SAVED WEIGHTS ------------------------------------------------------------------------")
+                        println("Iteration ",numFold)
+                        println(mean(validationLossesB))
+                    end
+
+
 
                 else
 
@@ -742,7 +769,7 @@ end;
 # Fijamos la semilla aleatoria para poder repetir los experimentos
 seed!(1);
 
-numFolds = 10;
+numFolds = 5;
 
 topology = [5,6];
 learningRate = 0.01;
