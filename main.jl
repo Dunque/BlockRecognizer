@@ -615,6 +615,8 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
     # Creamos los vectores para las metricas que se vayan a usar
     # En este caso, solo voy a usar precision y F1, en otro problema podrían ser distintas
+    trainAccuracies = Array{Float64,1}(undef, numFolds);
+    valAccuracies = Array{Float64,1}(undef, numFolds);
     testAccuracies = Array{Float64,1}(undef, numFolds);
     testF1         = Array{Float64,1}(undef, numFolds);
 
@@ -643,10 +645,22 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             # Pasamos el conjunto de test
             testOutputs = predict(model, testInputs);
+            trainingOutputs = predict(model,trainingInputs);
 
             # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
             (acc, _, _, _, _, _, F1, _) = confusionMatrix(testOutputs, testTargets);
             printConfusionMatrix(testOutputs, testTargets; weighted=true);
+
+            # Para accuracy del training
+            classes = unique(trainingTargets);
+            train_output_encoding=oneHotEncoding(trainingOutputs,classes);
+            train_target_encoding=oneHotEncoding(trainingTargets,classes);
+            numClasses = size(train_target_encoding,2);
+            if (numClasses==1)
+                acctrain   = accuracy(train_output_encoding[:,1],   train_target_encoding[:,1]);
+            else
+                acctrain   = accuracy(train_output_encoding,  train_target_encoding;   dataInRows=true);
+            end;
 
         else
 
@@ -661,6 +675,8 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
             # Como el entrenamiento de RR.NN.AA. es no determinístico, hay que entrenar varias veces, y
             #  se crean vectores adicionales para almacenar las metricas para cada entrenamiento
+            trainAccuraciesEachRepetition = Array{Float64,1}(undef, modelHyperparameters["numExecutions"]);
+            valAccuraciesEachRepetition = Array{Float64,1}(undef, modelHyperparameters["numExecutions"]);
             testAccuraciesEachRepetition = Array{Float64,1}(undef, modelHyperparameters["numExecutions"]);
             testF1EachRepetition         = Array{Float64,1}(undef, modelHyperparameters["numExecutions"]);
 
@@ -676,7 +692,7 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
                     # Con estos indices, se pueden crear los vectores finales que vamos a usar para entrenar una RNA
 
                     # Entrenamos la RNA, teniendo cuidado de codificar las salidas deseadas correctamente
-                    (ann, trainingLosses, validationLosses, testLosses, trainingAccuracies) = trainClassANN(modelHyperparameters["topology"],
+                    (ann, trainingLosses, validationLosses, testLosses, trainingAccuracies, validationAcc) = trainClassANN(modelHyperparameters["topology"],
                         trainingInputs[trainingIndices,:],   trainingTargets[trainingIndices,:],
                         trainingInputs[validationIndices,:], trainingTargets[validationIndices,:],
                         testInputs,                          testTargets;
@@ -723,7 +739,7 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
                     # Si no se desea usar conjunto de validacion, se entrena unicamente con conjuntos de entrenamiento y test,
                     #  teniendo cuidado de codificar las salidas deseadas correctamente
-                    (ann, trainingLosses, validationLosses, testLosses, trainingAccuracies) = trainClassANN(modelHyperparameters["topology"],
+                    (ann, trainingLosses, validationLosses, testLosses, trainingAccuracies, validationAcc) = trainClassANN(modelHyperparameters["topology"],
                         trainingInputs, trainingTargets,
                         testInputs,     testTargets;
                         maxEpochs=modelHyperparameters["maxEpochs"], learningRate=modelHyperparameters["learningRate"],
@@ -742,16 +758,23 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
                 # Calculamos las metricas correspondientes con la funcion desarrollada en la practica anterior
                 (testAccuraciesEachRepetition[numTraining], _, _, _, _, _, testF1EachRepetition[numTraining], _) = confusionMatrix(collect(ann(testInputs')'), testTargets);
-
+                valAccuraciesEachRepetition=validationAcc;
+                trainAccuraciesEachRepetition=trainingAccuracies;
             end;
 
             # Calculamos el valor promedio de todos los entrenamientos de este fold
             acc = mean(testAccuraciesEachRepetition);
+            acctrain = mean(trainAccuraciesEachRepetition);
+            accval = mean(valAccuraciesEachRepetition);
             F1  = mean(testF1EachRepetition);
 
         end;
 
         # Almacenamos las 2 metricas que usamos en este problema
+        trainAccuracies[numFold] = acctrain;
+        if modelType==:ANN
+            valAccuracies[numFold] = accval;
+        end;
         testAccuracies[numFold] = acc;
         testF1[numFold]         = F1;
 
@@ -759,6 +782,10 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
 
     end; # for numFold in 1:numFolds
 
+    println(modelType, ": Average train accuracy on a ", numFolds, "-fold crossvalidation: ", 100*mean(trainAccuracies), ", with a standard deviation of ", 100*std(trainAccuracies));
+    if modelType==:ANN
+        println(modelType, ": Average validation accuracy on a ", numFolds, "-fold crossvalidation: ", 100*mean(valAccuracies), ", with a standard deviation of ", 100*std(valAccuracies));
+    end;
     println(modelType, ": Average test accuracy on a ", numFolds, "-fold crossvalidation: ", 100*mean(testAccuracies), ", with a standard deviation of ", 100*std(testAccuracies));
     println(modelType, ": Average test F1 on a ", numFolds, "-fold crossvalidation: ", 100*mean(testF1), ", with a standard deviation of ", 100*std(testF1));
 
