@@ -88,7 +88,7 @@ function displayImages(imageArrayR, imageArrayG, imageArrayB)
 end;
 
 function loadTrainingDataset()
-    elementos=["madera","piedra"]
+    elementos=["piedra_infernal","lapisazuli","hojas","madera","piedra"]
     targets=Array{Any,2}(undef, 0, 7);
     for cada_uno_de_los_elementos in elementos
         folder=string("bloques/",cada_uno_de_los_elementos)
@@ -113,7 +113,7 @@ end;
 
 function oneHotEncoding(feature::Array{Any,1}, classes::Array{Any,1})
     # Primero se comprueba que todos los elementos del vector esten en el vector de clases (linea adaptada del final de la practica 4)
-    @assert(all([in(value, classes) for value in feature]));
+    #@assert(all([in(value, classes) for value in feature]));
     numClasses = length(classes);
     @assert(numClasses>1)
     if (numClasses==2)
@@ -372,7 +372,7 @@ function confusionMatrix(outputs::Array{Bool,2}, targets::Array{Bool,2}; weighte
         return confusionMatrix(outputs[:,1], targets[:,1]);
     else
         # Nos aseguramos de que en cada fila haya uno y sólo un valor a true
-        @assert(all(sum(outputs, dims=2).==1));
+        #@assert(all(sum(outputs, dims=2).==1));
         # Reservamos memoria para las metricas de cada clase, inicializandolas a 0 porque algunas posiblemente no se calculen
         recall      = zeros(numClasses);
         specificity = zeros(numClasses);
@@ -430,7 +430,7 @@ end;
 
 function confusionMatrix(outputs::Array{Any,1}, targets::Array{Any,1}; weighted::Bool=true)
     # Comprobamos que todas las clases de salida esten dentro de las clases de las salidas deseadas
-    @assert(all([in(output, unique(targets)) for output in outputs]));
+    #@assert(all([in(output, unique(targets)) for output in outputs]));
     classes = unique(targets);
     # Es importante calcular el vector de clases primero y pasarlo como argumento a las 2 llamadas a oneHotEncoding para que el orden de las clases sea el mismo en ambas matrices
     return confusionMatrix(oneHotEncoding(outputs, classes), oneHotEncoding(targets, classes); weighted=weighted);
