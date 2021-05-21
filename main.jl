@@ -33,7 +33,7 @@ display(image::Array{Float64,3}) = (@assert(size(image,3)==3); display(RGB.(imag
 
 # Cargar una imagen
 function loadFolderImages(folderName::String)
-    isImageExtension(fileName::String) = any(uppercase(fileName[end-3:end]) .== [".JPG", ".PNG"]);
+    isImageExtension(fileName::String) = any(uppercase(fileName[end-3:end]) .== [".JPG", ".PNG"]) | any(uppercase(fileName[end-4:end]) .== [".JPEG"]);
     images = [];
     for fileName in readdir(folderName)
         if isImageExtension(fileName)
@@ -88,7 +88,7 @@ function displayImages(imageArrayR, imageArrayG, imageArrayB)
 end;
 
 function loadTrainingDataset()
-    elementos=["piedra_infernal","lapisazuli","hojas","madera","piedra"]
+    elementos=["madera","arena","hojas","lapisazuli","mesa_arriba","mesa_lado_1","mesa_lado_2","piedra","piedra_infernal","tronco_1"]
     targets=Array{Any,2}(undef, 0, 7);
     for cada_uno_de_los_elementos in elementos
         folder=string("bloques/",cada_uno_de_los_elementos)
@@ -604,6 +604,7 @@ function modelCrossValidation(modelType::Symbol, modelHyperparameters::Dict, inp
     # Que clases de salida tenemos
     # Es importante calcular esto primero porque se va a realizar codificacion one-hot-encoding varias veces, y el orden de las clases deberia ser el mismo siempre
     classes = unique(targets);
+    print(classes);
 
     # Primero codificamos las salidas deseadas en caso de entrenar RR.NN.AA.
     if modelType==:ANN
